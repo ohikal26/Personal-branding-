@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visible &amp; Trusted — The Engine</title>
+<style>
+  :root{
+    --black:#0A0A0A; --g90:#1A1A1A; --g70:#4A4A4A; --g50:#7A7A7A; --g30:#AAAAAA;
+    --g15:#CFCFCF; --g10:#E2E2E2; --g05:#F2F2F2; --white:#fff;
+    --red:#E8000F; --redd:#FF3A3A; --redbg:#FFF5F5;
+    --sans:'Helvetica Neue',Helvetica,Arial,sans-serif;
+    --mono:'SF Mono','Roboto Mono',Menlo,Consolas,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:var(--sans);background:var(--white);color:var(--black);line-height:1.5;-webkit-font-smoothing:antialiased;}
+  button{font-family:var(--mono);cursor:pointer;border:none;}
+  textarea,input{font-family:var(--sans);outline:none;}
+  textarea:focus,input:focus{border-color:var(--g50)!important;}
+  .spine{position:fixed;left:0;top:0;bottom:0;width:4px;background:var(--red);z-index:50;}
+  .mono{font-family:var(--mono);text-transform:uppercase;letter-spacing:0.14em;}
+  .wm{font-family:var(--sans);font-weight:700;letter-spacing:0.17em;white-space:nowrap;}
+  .btn{font-family:var(--mono);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;font-weight:700;padding:13px 26px;transition:opacity .15s;}
+  .btn.sm{font-size:10px;padding:8px 16px;}
+  .btn.solid{background:var(--black);color:#fff;}
+  .btn.red{background:var(--red);color:#fff;}
+  .btn.ghost{background:transparent;color:var(--black);border:1.5px solid var(--black);}
+  .btn.link{background:transparent;color:var(--g50);padding:6px 2px;letter-spacing:0.10em;}
+  .btn:disabled{background:var(--g15);color:#fff;cursor:not-allowed;border-color:var(--g15);}
+  .btn.ghost:disabled{background:transparent;color:var(--g30);border-color:var(--g15);}
+  .btn:not(:disabled):hover{opacity:.85;}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--g15);border-top-color:var(--red);border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle;}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  #app{min-height:100vh;}
+  .wrap{max-width:780px;margin:0 auto;padding:30px 28px 90px 34px;}
+  .topbar{border-bottom:1px solid var(--g10);padding:14px 28px 14px 34px;display:flex;justify-content:space-between;align-items:center;}
+  .rail{display:flex;flex-wrap:wrap;gap:4px 6px;margin-bottom:26px;padding-bottom:16px;border-bottom:1px solid var(--g10);}
+  .rail button{font-family:var(--mono);font-size:9px;letter-spacing:0.08em;text-transform:uppercase;padding:5px 9px;font-weight:700;}
+  .rail .done{background:var(--black);color:#fff;}
+  .rail .active{background:var(--red);color:#fff;}
+  .rail .todo{background:var(--g05);color:var(--g30);cursor:default;}
+  .dayhead{border-top:2.5px solid var(--red);padding-top:10px;margin-bottom:20px;display:flex;align-items:baseline;gap:14px;}
+  .dayhead .n{font-size:38px;font-weight:700;letter-spacing:-0.04em;color:var(--g10);line-height:1;}
+  .dayhead .t{font-size:19px;font-weight:700;letter-spacing:-0.02em;text-transform:uppercase;}
+  .dayhead .s{font-size:12.5px;font-style:italic;color:var(--g50);margin-top:2px;}
+  .lead{font-size:13.5px;color:var(--g70);line-height:1.55;margin-bottom:18px;}
+  .fieldlabel{background:var(--black);padding:8px 13px;border-top:2.5px solid var(--red);}
+  .fieldlabel span{font-weight:700;font-size:13px;color:#fff;}
+  .fieldhint{background:var(--g05);padding:6px 13px;font-size:11.5px;font-style:italic;color:var(--g50);border-bottom:1px solid var(--g10);}
+  .ta,.inp{width:100%;font-size:14px;line-height:1.5;color:var(--g90);padding:11px 13px;border:1px solid var(--g10);border-top:none;resize:vertical;}
+  .flags{display:flex;flex-wrap:wrap;gap:5px 14px;margin-top:6px;}
+  .flags span{font-family:var(--mono);font-size:9.5px;color:var(--red);letter-spacing:0.04em;text-transform:none;}
+  .crit{margin-top:12px;display:flex;border:1px solid var(--g10);}
+  .crit .bar{width:4px;flex-shrink:0;}
+  .crit .body{padding:13px 16px;flex:1;}
+  .crit .vl{font-family:var(--mono);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;display:block;margin-bottom:6px;}
+  .crit .hl{font-weight:700;font-size:14px;margin-bottom:7px;letter-spacing:-0.01em;}
+  .crit .cr{font-size:13px;line-height:1.55;color:var(--g70);}
+  .crit .q{display:flex;gap:8px;margin-top:8px;}
+  .crit .q b{color:var(--red);font-weight:700;}
+  .crit .q span{font-size:13px;font-weight:600;color:var(--g90);line-height:1.5;}
+  .crit .rw{margin-top:10px;padding-top:10px;border-top:1px solid var(--g10);}
+  .crit .rw em{font-size:13px;font-style:italic;color:var(--g70);}
+  .section{margin-bottom:22px;}
+  .seclabel{font-family:var(--mono);font-size:10px;color:var(--g50);text-transform:uppercase;letter-spacing:0.14em;display:block;margin-bottom:12px;border-top:1px solid var(--g10);padding-top:14px;}
+  .nav{margin-top:26px;padding-top:18px;border-top:1px solid var(--g10);display:flex;align-items:center;justify-content:space-between;}
+  .gatenote{font-family:var(--mono);font-size:9px;color:var(--red);letter-spacing:0.04em;max-width:300px;text-align:right;text-transform:none;}
+  .pickgrid{display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:24px;}
+  .pick{text-align:left;padding:18px;border:1px solid var(--g10);background:var(--g05);cursor:pointer;}
+  .pick.on{border:2px solid var(--red);background:var(--redbg);}
+  .pick h4{font-size:14.5px;margin-bottom:7px;}
+  .pick p{font-size:12.5px;color:var(--g70);line-height:1.5;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:0 24px;}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;}
+  /* cover */
+  .cover{background:var(--black);min-height:100vh;display:flex;flex-direction:column;}
+  .cover .cbar{display:flex;justify-content:space-between;align-items:center;padding:22px 28px 22px 34px;border-bottom:.5px solid rgba(255,255,255,.12);}
+  .cover .cmid{flex:1;padding:56px 34px;max-width:760px;margin:0 auto;width:100%;}
+  .cover h1{font-size:54px;font-weight:700;letter-spacing:-0.035em;line-height:.94;color:#fff;}
+  .cover h1 .amp{color:var(--red);}
+  .cover .sub{font-size:14px;color:rgba(255,255,255,.45);margin-top:18px;max-width:520px;line-height:1.6;}
+  .cover .feats{display:grid;grid-template-columns:1fr 1fr;gap:18px 30px;max-width:560px;margin:30px 0 40px;}
+  .cover .feat .fn{font-family:var(--mono);color:var(--redd);font-size:9px;letter-spacing:.14em;display:block;margin-bottom:6px;}
+  .cover .feat h5{color:#fff;font-size:14px;margin-bottom:5px;}
+  .cover .feat p{color:rgba(255,255,255,.42);font-size:12px;line-height:1.5;}
+  .cover .foot{padding:18px 34px;border-top:.5px solid rgba(255,255,255,.12);}
+  /* brief */
+  .brief{border:1px solid var(--g10);padding:34px 38px;}
+  .brief .bh{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--black);padding-bottom:14px;margin-bottom:22px;}
+  .brief h2{font-size:29px;font-weight:700;letter-spacing:-0.03em;line-height:1.05;margin-bottom:6px;}
+  .brief .meta{font-size:13px;color:var(--g50);margin-bottom:22px;}
+  .hero{background:var(--black);padding:24px 26px;margin-bottom:22px;}
+  .hero .hl{font-family:var(--mono);color:var(--redd);font-size:9.5px;letter-spacing:.14em;display:block;margin-bottom:10px;}
+  .hero .word{font-size:36px;font-weight:700;letter-spacing:-0.03em;color:#fff;line-height:1.05;margin-bottom:10px;text-transform:capitalize;}
+  .hero .rat{font-size:13px;color:rgba(255,255,255,.55);line-height:1.55;max-width:520px;}
+  .btag{font-family:var(--mono);color:var(--red);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;display:block;margin-bottom:7px;border-bottom:1px solid var(--g10);padding-bottom:5px;}
+  .pos{font-size:17px;font-weight:600;line-height:1.5;letter-spacing:-0.01em;}
+  .pq{border-left:3px solid var(--red);padding-left:14px;margin-top:14px;font-size:15px;font-style:italic;color:var(--g90);line-height:1.5;}
+  table.t{width:100%;border-collapse:collapse;}
+  table.t td{padding:8px 11px;border-bottom:1px solid var(--g10);vertical-align:top;}
+  table.t td.k{font-size:12px;font-weight:700;width:30%;}
+  table.t td.v{font-size:12.5px;color:var(--g70);line-height:1.45;}
+  .pcard{background:var(--g05);padding:12px 13px;border-top:2px solid var(--red);}
+  .pcard .pn{font-family:var(--mono);color:var(--g30);font-size:8.5px;display:block;margin-bottom:5px;}
+  .pcard .pnm{font-size:12.5px;font-weight:700;line-height:1.35;margin-bottom:4px;}
+  .pcard .pcv{font-size:11.5px;color:var(--g70);line-height:1.4;margin-bottom:4px;}
+  .pcard .pag{font-size:11px;color:var(--g50);font-style:italic;line-height:1.4;}
+  .ul{list-style:none;}
+  .ul li{font-size:13px;line-height:1.5;color:var(--g90);padding-left:14px;position:relative;margin-bottom:5px;}
+  .ul li:before{content:'·';position:absolute;left:0;color:var(--red);font-weight:700;}
+  .mlabel{font-family:var(--mono);font-size:9px;color:var(--g50);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:6px;}
+  .bio{font-size:13px;color:var(--g90);font-style:italic;line-height:1.5;margin-bottom:10px;}
+  .sb{display:flex;gap:8px;margin-bottom:6px;}
+  .sb b{color:var(--red);font-weight:700;}
+  .sb span{font-size:13.5px;color:var(--black);line-height:1.45;font-weight:500;}
+  .splitbox{display:flex;gap:2px;margin-bottom:22px;}
+  .splitbox .a{flex:1;background:var(--redbg);border-left:3px solid var(--red);padding:14px 16px;}
+  .splitbox .b{flex:1;background:var(--g05);padding:14px 16px;}
+  .splitbox .l{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;display:block;margin-bottom:6px;}
+  .uploadbox{border:1px solid var(--g10);margin-bottom:24px;}
+  .uploadbox .uh{background:var(--g05);padding:12px 16px;border-bottom:1px solid var(--g10);}
+  .uploadbox .ub{padding:16px;}
+  .small{font-size:13px;color:var(--g70);}
+  .tiny{font-family:var(--mono);font-size:8.5px;color:var(--g30);letter-spacing:.1em;text-transform:uppercase;}
+  .pickrow{display:flex;gap:11px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--g10);}
+  .pickrow input{margin-top:3px;width:15px;height:15px;accent-color:var(--red);}
+  @media print{
+    .noprint{display:none!important;}
+    .spine{display:none;}
+    .brief{border:none;padding:0;}
+    body{padding:0;}
+  }
+  @media(max-width:680px){
+    .pickgrid,.row2,.row3,.cover .feats,.splitbox{grid-template-columns:1fr;display:block;}
+    .splitbox .a,.splitbox .b{margin-bottom:2px;}
+    .cover h1{font-size:42px;}
+  }
+</style>
+</head>
+<body>
+<div class="spine"></div>
+<div id="app"></div>
+
+<script>
+"use strict";
+/* ════════════════════════════════════════════════════════════════════
+   VISIBLE & TRUSTED — THE ENGINE  (self-contained HTML prototype)
+   Two-layer challenge: instant rule layer + AI coach (with graceful
+   offline fallback). Hard gates on positioning + the word you own.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ---- nothing-words: instant rule layer ---- */
+var VAGUE = {
+  "professionals":"which professionals, exactly?","businesses":"what kind, at what stage?",
+  "business":"what kind, at what stage?","companies":"which companies?","organizations":"which ones?",
+  "organisations":"which ones?","growth":"growth in what, and for whom?","grow":"grow what, specifically?",
+  "solutions":"a non-word; what actual thing?","solution":"a non-word; what actual thing?",
+  "people":"which people?","success":"success at what?","results":"what result, measured how?",
+  "value":"value of what kind?","impact":"impact on what?","empower":"corporate filler; cut it",
+  "leverage":"corporate filler; cut it","synergy":"corporate filler; cut it","synergies":"corporate filler; cut it",
+  "holistic":"vague; what specifically?","passionate":"show it, don't claim it","dedicated":"show it, don't claim it",
+  "world-class":"says nothing","best-in-class":"says nothing","cutting-edge":"says nothing",
+  "results-driven":"everyone says this","innovative":"show it, don't claim it","seamless":"marketing filler",
+  "transform":"transform from what to what?","helping people":"helping which people do what?"
+};
+function vagueFlags(text){
+  if(!text) return [];
+  var low = " " + text.toLowerCase().replace(/[^a-z\s-]/g," ") + " ";
+  var out = [];
+  for(var w in VAGUE){ if(low.indexOf(" "+w+" ")>=0) out.push({w:w, note:VAGUE[w]}); }
+  return out.slice(0,4);
+}
+function flagsHTML(text){
+  var f = vagueFlags(text);
+  if(!f.length) return "";
+  return f.map(function(x){ return '<span>&#9873; &ldquo;'+x.w+'&rdquo; — '+x.note+'</span>'; }).join("");
+}
+
+/* ---- AI coach (works inside Claude; falls back gracefully) ---- */
+var AI_OK = null; // null unknown, true/false after first call
+function parseJSON(t){
+  var s = t.replace(/```json/gi,"").replace(/```/g,"").trim();
+  var i = s.indexOf("{"), j = s.lastIndexOf("}");
+  if(i>=0 && j>=0) s = s.slice(i,j+1);
+  return JSON.parse(s);
+}
+function callClaude(system, user){
+  return fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1000, system:system, messages:[{role:"user",content:user}] })
+  }).then(function(res){
+    if(!res.ok) throw new Error("API "+res.status);
+    return res.json();
+  }).then(function(data){
+    AI_OK = true;
+    var blocks = (data.content||[]).filter(function(b){return b.type==="text";});
+    return blocks.map(function(b){return b.text;}).join("").trim();
+  });
+}
+
+var CHALLENGE_SYS = "You are a senior brand strategist at The Brand Company, working in the Visible & Trusted method. You challenge a professional to sharpen their personal brand. Direct, Socratic, never flatter. Judge every answer against one standard: is it SPECIFIC, DISTINCT, and TRUE, or a vague platitude anyone in their field could say? Nothing-words (professionals, businesses, growth, solutions, help people, results, value, impact, passionate, leverage, holistic) are the enemy; name them and demand the real thing. If a direct competitor could say the identical sentence, it is not positioning. The intended reader must think 'this was written for me.' Truth beats polish. On clarity work push HARD; do not pass anything vague. Keep critique under 55 words. Return ONLY valid JSON, no markdown, this shape: {\"verdict\":\"sharp|close|vague\",\"headline\":\"6-9 word judgement\",\"critique\":\"<=55 words\",\"questions\":[\"one sharpening question\"],\"rewrite_hint\":\"a sharper reframe in their voice, or empty string\"}";
+
+var OWN_SYS = "You are a senior brand strategist at The Brand Company helping a professional choose the single WORD or short PHRASE they want to own in their audience's mind (the way Volvo owns safety). Judge hard against four tests: DISTINCT (not already owned by the whole category; quality/trusted/innovative are dead), OWNABLE (can THIS person credibly own it), TRUE (connects to what they believe and do), MEMORABLE (a real plain word a human repeats, not jargon). A generic word fails. Return ONLY JSON: {\"verdict\":\"sharp|close|vague\",\"headline\":\"6-9 words\",\"critique\":\"<=55 words\",\"questions\":[\"one question\"],\"rewrite_hint\":\"2-3 sharper candidate words, comma separated, or empty\"}";
+
+/* offline heuristic critique so the prototype works anywhere */
+function localCritique(text){
+  var flags = vagueFlags(text);
+  var words = (text||"").trim().split(/\s+/).filter(Boolean).length;
+  if(!text || words < 4){
+    return {verdict:"vague", headline:"Too thin to judge yet", critique:"There isn't enough here to test. Write a full, specific sentence in your own words, then challenge it again.", questions:["What is the single most specific, true thing you can say here?"], rewrite_hint:"", offline:true};
+  }
+  if(flags.length){
+    var named = flags.map(function(f){return '\u201C'+f.w+'\u201D';}).join(", ");
+    return {verdict:"vague", headline:"Nothing-words are doing the work", critique:"You're leaning on "+named+". A competitor could say the same line. Replace each with something only you, for this exact person, would say.", questions:["Who specifically, and what specifically, do these words stand in for?"], rewrite_hint:"", offline:true};
+  }
+  if(words < 12){
+    return {verdict:"close", headline:"Specific, but go one level deeper", critique:"No filler words, which is good. Now make it sharper: name the exact person and the exact change so the right reader feels it was written for them.", questions:["Could only you say this, or could a direct competitor copy it word for word?"], rewrite_hint:"", offline:true};
+  }
+  return {verdict:"close", headline:"Solid; tighten and commit", critique:"This reads specific and true. Trim any spare words and make sure it names a real outcome, not just a process.", questions:["What is the one word in here you could cut without losing meaning?"], rewrite_hint:"", offline:true};
+}
+
+function challenge(system, context, exercise, answer){
+  var user = "CONTEXT\n"+context+"\n\nEXERCISE\n"+exercise+"\n\nTHEIR ANSWER\n\"\"\""+answer.trim()+"\"\"\"";
+  return callClaude(system, user).then(function(text){
+    var r = parseJSON(text); r.offline=false; return r;
+  }).catch(function(){
+    AI_OK = false;
+    return localCritique(answer);
+  });
+}
+
+/* ---- state ---- */
+var S = {
+  step:0, maxReached:0,
+  status:{}, // id -> {verdict, attempts}
+  distill:null, distilling:false, distillErr:null,
+  a:{
+    direction:"",
+    profile:{field:"",goal:"",audience:"",where:""},
+    d1:{belief:"",pattern:""},
+    d2:{deepdive:""},
+    d3:{v1:"",v2:"",v3:"",final:""},
+    own:{word:"",why:""},
+    d4:{throughline:"",b1:"",b2:"",b3:""},
+    d5:{platform:"",rhythm:"",p1:"",p2:"",p3:""},
+    d6:{opening:"",body:"",closing:""},
+    d7:{open:"",point:"",close:""},
+    proof:{credibility:"",stories:"",topics_own:"",topics_avoid:""}
+  }
+};
+
+var STEPS = [
+  {key:"start",tag:"Start"},{key:"direction",tag:"Direction"},
+  {key:"d1",tag:"01"},{key:"d2",tag:"02"},{key:"d3",tag:"03"},{key:"own",tag:"\u2605 Word"},
+  {key:"d4",tag:"04"},{key:"d5",tag:"05"},{key:"d6",tag:"06"},{key:"d7",tag:"07"},
+  {key:"proof",tag:"\u2605 Proof"},{key:"brief",tag:"\u2726 Brief"}
+];
+var GATED = {2:"d1_belief", 4:"d3_final", 5:"own_word"};
+
+function ctx(){
+  var a=S.a;
+  return "Field: "+(a.profile.field||"-")+". Goal: "+(a.profile.goal||"-")+". Audience: "+(a.profile.audience||"-")+
+    ". Direction: "+(a.direction==="clients"?"attract clients & business":a.direction==="reputation"?"build career reputation":"-")+".";
+}
+function go(i){ S.step=i; if(i>S.maxReached) S.maxReached=i; window.scrollTo(0,0); render(); }
+function next(){ go(Math.min(S.step+1, STEPS.length-1)); }
+function back(){ go(Math.max(S.step-1,0)); }
+
+function canContinue(){
+  var id = GATED[S.step];
+  if(!id) return true;
+  var s = S.status[id];
+  if(!s) return S.step===2;          // day1 lenient if untested
+  return s.verdict==="sharp" || s.verdict==="close" || s.attempts>=3;
+}
+
+/* ---- helpers to build markup ---- */
+function esc(s){ return (s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function val(path){ var p=path.split("."); return S.a[p[0]][p[1]]||""; }
+
+function fieldHTML(o){
+  // o: {label,hint,bind,rows,flags,placeholder,plain}
+  var hint = o.hint ? '<div class="fieldhint">'+o.hint+'</div>' : '';
+  var tag = o.plain
+    ? '<input class="inp" data-bind="'+o.bind+'" placeholder="'+esc(o.placeholder||"")+'" value="'+esc(val(o.bind))+'">'
+    : '<textarea class="ta" data-bind="'+o.bind+'" rows="'+(o.rows||2)+'" placeholder="'+esc(o.placeholder||"")+'">'+esc(val(o.bind))+'</textarea>';
+  var flags = o.flags ? '<div class="flags" id="flags-'+o.bind.replace(".","-")+'">'+flagsHTML(val(o.bind))+'</div>' : '';
+  return '<div class="section" style="margin-bottom:18px"><div class="fieldlabel"><span>'+o.label+'</span></div>'+hint+tag+flags+'</div>';
+}
+
+function challengeHTML(o){
+  // o: {id,label,hint,bind,rows,placeholder,gate,sys}
+  var st = S.status[o.id] || {};
+  var verdictPill = st.verdict ? '<span class="mono" style="font-size:10px;color:'+verdictColor(st.verdict)+'">'+
+     (st.verdict==="sharp"?"\u2713 Sharp":st.verdict==="close"?"~ Close":"\u2717 Vague")+'</span>' : '';
+  return '<div class="section" data-cid="'+o.id+'" data-sys="'+(o.sys||"challenge")+'" data-bind="'+o.bind+'" '+
+            'data-exercise="'+esc(o.exercise||"")+'" data-gate="'+(o.gate?"1":"0")+'">'+
+    '<div class="fieldlabel"><span>'+o.label+'</span></div>'+
+    (o.hint?'<div class="fieldhint">'+o.hint+'</div>':'')+
+    '<textarea class="ta" data-bind="'+o.bind+'" data-flags="1" rows="'+(o.rows||3)+'" placeholder="'+esc(o.placeholder||"")+'">'+esc(val(o.bind))+'</textarea>'+
+    '<div class="flags" id="flags-'+o.bind.replace(".","-")+'">'+flagsHTML(val(o.bind))+'</div>'+
+    '<div style="display:flex;align-items:center;gap:14px;margin-top:10px">'+
+      '<button class="btn red sm" data-challenge="'+o.id+'">Challenge this &rarr;</button>'+
+      '<span id="pill-'+o.id+'">'+verdictPill+'</span>'+
+    '</div>'+
+    '<div id="crit-'+o.id+'"></div>'+
+  '</div>';
+}
+function verdictColor(v){ return v==="sharp"?"var(--black)":v==="close"?"var(--g50)":"var(--red)"; }
+
+function navHTML(canNext, gateNote){
+  return '<div class="nav noprint"><button class="btn link" data-nav="back">&larr; Back</button>'+
+    '<div style="display:flex;align-items:center;gap:14px">'+
+    (gateNote?'<span class="gatenote">'+gateNote+'</span>':'')+
+    '<button class="btn solid" data-nav="next" '+(canNext?'':'disabled')+'>Continue &rarr;</button></div></div>';
+}
+function dayHead(n,t,s){
+  return '<div class="dayhead"><span class="n">'+n+'</span><div><div class="t">'+t+'</div><div class="s">'+s+'</div></div></div>';
+}
+
+/* ---- render the current step ---- */
+function render(){
+  var app = document.getElementById("app");
+  var step = S.step;
+
+  if(step===0){ app.innerHTML = coverHTML(); return; }
+
+  var inner = '';
+  inner += '<div class="topbar noprint"><span class="wm" style="font-size:12px">THE BRAND COMPANY</span>'+
+           '<span class="mono" style="font-size:9px;color:var(--g30)">Visible &amp; Trusted — The Engine</span></div>';
+  inner += '<div class="wrap">';
+  inner += railHTML();
+  inner += stepHTML(step);
+  inner += '</div>';
+  app.innerHTML = inner;
+}
+
+function railHTML(){
+  var h = '<div class="rail noprint">';
+  for(var i=0;i<STEPS.length;i++){
+    var cls = i===S.step?"active":(i<=S.maxReached?"done":"todo");
+    h += '<button class="'+cls+'" '+(i<=S.maxReached?'data-go="'+i+'"':'')+'>'+STEPS[i].tag+'</button>';
+  }
+  return h+'</div>';
+}
+
+function coverHTML(){
+  var feats = [
+    ["It challenges, not collects","Every clarity answer is tested against one standard: specific, distinct, and true, or a platitude anyone could say."],
+    ["It pushes for distinct positioning","You won't pass Day 3 or the Word You Own with something generic. That friction is the point."],
+    ["It finds the word you own","One word or phrase that becomes your territory in your audience's mind."],
+    ["It distils a brief","A practicable brief you can hand to a producer, PR firm, or writer."]
+  ];
+  var fh = feats.map(function(f,i){
+    return '<div class="feat"><span class="fn">'+("0"+(i+1)).slice(-2)+'</span><h5>'+f[0]+'</h5><p>'+f[1]+'</p></div>';
+  }).join("");
+  return '<div class="cover">'+
+    '<div class="cbar"><span class="wm" style="color:#fff;font-size:12px">THE BRAND COMPANY</span>'+
+      '<span class="mono" style="font-size:9px;color:rgba(255,255,255,.55)">Personal Brand Engine</span></div>'+
+    '<div class="cmid">'+
+      '<h1>VISIBLE<br><span class="amp">&amp;</span> TRUSTED</h1>'+
+      '<div class="sub">A seven-step engine that interrogates your thinking, refuses vague answers, and distils a clear, distinct personal brand, built on The Brand Company\u2019s Visible &amp; Trusted method.</div>'+
+      '<div style="width:20px;height:1px;background:rgba(255,255,255,.18);margin:26px 0"></div>'+
+      '<div class="feats">'+fh+'</div>'+
+      '<div style="display:flex;gap:14px;align-items:center">'+
+        '<button class="btn red" data-go="1">Begin &rarr;</button>'+
+        '<button class="btn link" style="color:rgba(255,255,255,.45)" data-resume="1">Resume from file</button>'+
+        '<input type="file" id="resumeFile" accept="application/json" style="display:none">'+
+      '</div>'+
+      '<div style="margin-top:34px"><span class="tiny" style="color:rgba(255,255,255,.30)">Uses AI to challenge your answers · Progress isn\u2019t auto-saved — export any time</span></div>'+
+    '</div>'+
+    '<div class="foot"><span class="tiny" style="color:rgba(255,255,255,.20)">The Brand Company · 2025</span></div>'+
+  '</div>';
+}
+
+function stepHTML(step){
+  var a=S.a, h='';
+  switch(step){
+    case 1: /* direction + profile */
+      h += dayHead("&rarr;","Set Your Direction","What you're building toward shapes everything that follows.");
+      h += uploadHTML();
+      h += '<p class="lead">Pick the direction that fits you right now. You can pursue both eventually, but the engine challenges you toward one.</p>';
+      h += '<div class="pickgrid">'+
+        pickCard("clients","Attract clients & business","You offer a service or product. Positioning leans toward the problem you solve and the outcome you deliver.")+
+        pickCard("reputation","Build career reputation","You want recognition and opportunities in your field. Positioning leans toward your point of view.")+
+      '</div>';
+      h += '<span class="seclabel">Your profile — the engine refers back to this</span>';
+      h += fieldHTML({label:"Your profession / field",bind:"profile.field",plain:true,placeholder:"e.g. corporate lawyer · UX designer · financial advisor · founder"});
+      h += fieldHTML({label:"Your primary goal",bind:"profile.goal",plain:true,placeholder:"e.g. win new clients · get promoted · attract recruiters"});
+      h += fieldHTML({label:"The audience you want to reach",bind:"profile.audience",plain:true,placeholder:"e.g. startup founders · HR directors · homeowners · CFOs"});
+      h += fieldHTML({label:"Where they spend time online",bind:"profile.where",plain:true,placeholder:"e.g. LinkedIn · Instagram · industry newsletters · X"});
+      h += navHTML(!!a.direction && !!a.profile.field, (!a.direction||!a.profile.field)?"Choose a direction and name your field to continue":null);
+      break;
+    case 2:
+      h += dayHead("01","Inner Clarity","What do you believe? Who do you most want to reach?");
+      h += '<p class="lead">Everything visible is downstream of this. Write what is actually true, not what sounds impressive.</p>';
+      h += challengeHTML({id:"d1_belief",bind:"d1.belief",gate:true,rows:3,
+        label:"Most people in my field believe ___ but I believe ___",
+        hint:"A real, contrarian conviction, not a mission statement. If everyone agrees, it isn't a belief.",
+        placeholder:"e.g. Most marketers believe more content wins. I believe one true idea, repeated, wins.",
+        exercise:"Their core professional belief. Reject platitudes; demand a genuine, defensible point of view."});
+      h += fieldHTML({label:"The pattern beneath your best audience",bind:"d1.pattern",rows:2,
+        hint:"The people you most want to reach: what do they share underneath?",
+        placeholder:"They were all at a moment of ___ / they all wanted ___ / they were all frustrated by ___"});
+      h += navHTML(canContinue(), canContinue()?null:"Sharpen your belief — challenge it until it's at least close.");
+      break;
+    case 3:
+      h += dayHead("02","Audience Deep Dive","One person, full depth — what they need and what changes.");
+      h += '<p class="lead">Pick one real person who represents who you want to reach. Go deeper than a job title: their situation, what they fear, what changes when they get it right.</p>';
+      h += challengeHTML({id:"d2_deepdive",bind:"d2.deepdive",rows:5,
+        label:"The one person — their situation, fear, and the change they want",
+        hint:"In their words, not yours. The specificity here is the raw material for your positioning.",
+        placeholder:"e.g. A first-time manager. Says: 'I was great at the work, now I'm responsible for people and no one taught me how.' Afraid they were promoted too soon. What changes: they stop doing the work themselves and start coaching the team.",
+        exercise:"A depth portrait of one target person. Push for real, specific, in-their-own-words detail; reject generic personas."});
+      h += navHTML(true);
+      break;
+    case 4:
+      h += dayHead("03","Positioning Statement","One sentence: who, what struggle, what changes.");
+      h += '<div style="background:var(--g05);border-left:3px solid var(--red);padding:13px 16px;margin-bottom:18px;font-size:14px;font-style:italic;color:var(--g90);line-height:1.55">'+
+        'I help <b style="color:var(--red);font-style:normal">[specific person]</b> who <b style="color:var(--red);font-style:normal">[specific struggle, in their words]</b> to <b style="color:var(--red);font-style:normal">[specific change]</b> so that <b style="color:var(--red);font-style:normal">[meaningful outcome]</b>.</div>';
+      h += '<p class="lead">Draft three. The third is usually where the truth is. Then sharpen your best one — this gate is real.</p>';
+      h += fieldHTML({label:"Version 1",bind:"d3.v1",rows:2,placeholder:"First attempt — rough is fine"});
+      h += fieldHTML({label:"Version 2",bind:"d3.v2",rows:2,placeholder:"Push further"});
+      h += fieldHTML({label:"Version 3",bind:"d3.v3",rows:2,placeholder:"Now the truth"});
+      h += challengeHTML({id:"d3_final",bind:"d3.final",gate:true,rows:3,
+        label:"Your positioning — the one you'll commit to",
+        hint:"Specific enough that your Day 2 person thinks 'this is for me', and no competitor could say it word for word.",
+        placeholder:"Paste your best version and sharpen it here.",
+        exercise:"Their committed positioning statement. The core. Push HARD on specificity and distinctiveness; refuse anything a competitor could also say."});
+      h += navHTML(canContinue(), canContinue()?null:"Positioning must reach 'sharp' or 'close' — keep challenging it.");
+      break;
+    case 5:
+      h += dayHead("\u2605","The Word You Own","One word or phrase that becomes your territory.");
+      h += '<p class="lead">The strongest brands own a single idea in the mind — Volvo owns <i>safety</i>, a person might own <i>clarity</i> or <i>\u201Cthe boring-on-purpose engineer.\u201D</i> It must be distinct, credibly yours, true to your belief, and memorable. The engine tests all four.</p>';
+      h += challengeHTML({id:"own_word",bind:"own.word",gate:true,rows:2,sys:"own",
+        label:"The word or phrase I want to own",
+        hint:"One word, or a short phrase. Plain language a human would actually repeat.",
+        placeholder:"e.g. clarity · the translator · unfussy · 'makes the complex obvious'",
+        exercise:"The single word/phrase they want to own. Judge distinct / ownable / true / memorable. Push hard; generic category words fail."});
+      h += fieldHTML({label:"Why this is credibly yours",bind:"own.why",rows:2,
+        hint:"What in your belief, story, or way of working earns you this word?",
+        placeholder:"e.g. I've spent 10 years translating between engineers and executives; it's the thing people always thank me for."});
+      h += navHTML(canContinue(), canContinue()?null:"Find a word that's genuinely ownable — keep challenging.");
+      break;
+    case 6:
+      h += dayHead("04","Core Language","Their words, and the beliefs that drive your content.");
+      h += challengeHTML({id:"d4_throughline",bind:"d4.throughline",rows:2,
+        label:"Your through-line sentence",
+        hint:"What you do, said the way your Day 2 person would say it, not the way you'd write it on a CV.",
+        placeholder:"e.g. I take the part of the job everyone finds confusing and make it feel obvious.",
+        exercise:"Their plain-language through-line. Push for plainness and truth; reject jargon and CV-speak."});
+      h += '<span class="seclabel">Your three core beliefs — the engine of all your content</span>';
+      h += fieldHTML({label:"Belief 1",bind:"d4.b1",rows:1,placeholder:"e.g. Most problems blamed on skill are really problems of clarity."});
+      h += fieldHTML({label:"Belief 2",bind:"d4.b2",rows:1,placeholder:"e.g. The simplest explanation in the room is usually the most expert one."});
+      h += fieldHTML({label:"Belief 3",bind:"d4.b3",rows:1,placeholder:"e.g. People don't buy the best work; they buy the work they understand."});
+      h += navHTML(true);
+      break;
+    case 7:
+      h += dayHead("05","Content Strategy","One platform, one rhythm, three ideas.");
+      h += '<p class="lead">Not complicated. One platform, one rhythm. Three post ideas, one from each belief. The engine eases off here; this is execution.</p>';
+      h += fieldHTML({label:"My platform — and why I can sustain it 90 days",bind:"d5.platform",rows:2,placeholder:"e.g. LinkedIn — my audience of HR directors lives there and I can write fast"});
+      h += fieldHTML({label:"My posting rhythm",bind:"d5.rhythm",plain:true,placeholder:"e.g. every Tuesday; draft on Sunday evening"});
+      h += fieldHTML({label:"Belief 1 → Post idea",bind:"d5.p1",rows:2,placeholder:"The simplest story that brings belief 1 to life"});
+      h += fieldHTML({label:"Belief 2 → Post idea",bind:"d5.p2",rows:2,placeholder:"…belief 2"});
+      h += fieldHTML({label:"Belief 3 → Post idea",bind:"d5.p3",rows:2,placeholder:"…belief 3"});
+      h += navHTML(true);
+      break;
+    case 8:
+      h += dayHead("06","First Written Piece","Write it. Post it. Today — not tomorrow.");
+      h += fieldHTML({label:"The opening line — what appears before 'see more'",bind:"d6.opening",rows:2,placeholder:"e.g. The most common reason good professionals stay invisible has nothing to do with talent."});
+      h += fieldHTML({label:"The body — one point, developed",bind:"d6.body",rows:6,placeholder:"Use the post idea you circled. One specific example. Short paragraphs. No jargon."});
+      h += fieldHTML({label:"The closing — a question or reframe, not a sales pitch",bind:"d6.closing",rows:2,placeholder:"e.g. What would change for your team if you stopped solving and started asking?"});
+      h += navHTML(true);
+      break;
+    case 9:
+      h += dayHead("07","First Video","30 seconds. Your phone. Real presence — not production.");
+      h += fieldHTML({label:"Opening (0–5s) — straight to the idea",bind:"d7.open",rows:2,placeholder:"e.g. Most people think this part of the job is about talent. It isn't."});
+      h += fieldHTML({label:"The point (5–20s) — one specific observation",bind:"d7.point",rows:3,placeholder:"The boring habit nobody talks about, and the one you rely on."});
+      h += fieldHTML({label:"Close (20–30s) — a reframe or a question",bind:"d7.close",rows:2,placeholder:"Try it once this week and watch what changes."});
+      h += navHTML(true);
+      break;
+    case 10:
+      h += dayHead("\u2605","Proof & Stories","The raw material that makes your brief credible to others.");
+      h += '<p class="lead">This step turns your clarity into something a producer, publicist, or writer can act on. It feeds your bios, talking points, and sound bites. Be concrete and honest; anything you leave blank simply won\u2019t appear.</p>';
+      h += fieldHTML({label:"Proof — why you're worth listening to",bind:"proof.credibility",rows:3,hint:"Track record, results, scale, years, recognition. Real markers, not adjectives.",placeholder:"e.g. Scaled ops at 3 venture-backed companies; took one from 20 to 180 people in 18 months; cut errors 60%."});
+      h += fieldHTML({label:"Signature stories — 1 or 2 you can tell",bind:"proof.stories",rows:4,hint:"Specific moments, not lessons.",placeholder:"e.g. The $40M company that ran on one person's memory, and the month it nearly broke."});
+      h += fieldHTML({label:"Topics you want to be known for",bind:"proof.topics_own",rows:2,placeholder:"e.g. operational scaling, the first systems a growing company needs, why good people quit"});
+      h += fieldHTML({label:"Topics to steer away from",bind:"proof.topics_avoid",rows:2,placeholder:"e.g. fundraising and valuations; pure culture talk untethered from operations"});
+      h += '<div style="margin-top:26px;padding-top:20px;border-top:1px solid var(--g10);text-align:center">'+
+        '<p style="font-size:13.5px;color:var(--g70);margin-bottom:16px">That\u2019s everything. Now let the engine distil it into your brief.</p>'+
+        '<button class="btn red" data-distill="1">Distil my brief &rarr;</button></div>';
+      break;
+    case 11:
+      h += briefHTML();
+      break;
+  }
+  return h;
+}
+
+function pickCard(k,h,b){
+  var on = S.a.direction===k ? " on" : "";
+  return '<button class="pick'+on+'" data-pick="'+k+'"><h4>'+h+'</h4><p>'+b+'</p></button>';
+}
+
+function uploadHTML(){
+  return '<div class="uploadbox noprint">'+
+    '<div class="uh"><span class="mono" style="font-size:9.5px;color:var(--red);display:block;margin-bottom:3px">Start faster — optional</span>'+
+    '<span class="small">Paste a CV, bio, or about-page. The engine pulls what\u2019s genuinely there for you to confirm.</span></div>'+
+    '<div class="ub">'+
+      '<textarea class="ta" id="pasteDoc" style="border-top:1px solid var(--g10)" rows="3" placeholder="Paste text here (optional)…"></textarea>'+
+      '<div style="margin-top:10px;display:flex;gap:12px;align-items:center">'+
+        '<button class="btn ghost sm" data-extract="1">Extract fields &rarr;</button>'+
+        '<span class="tiny" id="extractNote">Review-and-confirm — nothing is auto-accepted</span>'+
+      '</div>'+
+      '<div id="extractResult"></div>'+
+    '</div></div>';
+}
+
+/* ---- brief (distillation + render) ---- */
+function briefHTML(){
+  if(S.distilling && !S.distill){
+    return '<div style="text-align:center;padding:80px 0"><span class="spin"></span>'+
+      '<div style="margin-top:16px"><span class="mono" style="font-size:11px;color:var(--g50)">Distilling your brief…</span></div>'+
+      '<p style="font-size:12.5px;color:var(--g30);margin-top:10px">Synthesising positioning, the word you own, voice, bios, talking points, and sound bites.</p></div>';
+  }
+  if(!S.distill){
+    return '<div style="text-align:center;padding:60px 0"><button class="btn red" data-distill="1">Distil my brief &rarr;</button></div>';
+  }
+  var D = S.distill, a = S.a;
+  var offlineNote = D._offline ? '<div class="noprint" style="background:var(--redbg);border-left:3px solid var(--red);padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--g70)">Live coach wasn\u2019t reachable, so this brief was assembled locally from your answers. Inside Claude, the engine writes it with full AI synthesis.</div>' : '';
+
+  var h = '<div class="noprint" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">'+
+    '<button class="btn link" data-nav="back">&larr; Back</button>'+
+    '<div style="display:flex;gap:10px">'+
+      '<button class="btn ghost sm" data-export="1">Export for brief</button>'+
+      '<button class="btn red sm" data-print="1">Print / Save PDF</button>'+
+    '</div></div>';
+  h += offlineNote;
+  h += '<div class="brief">';
+  h += '<div class="bh"><span class="wm" style="font-size:11px">THE BRAND COMPANY</span><span class="mono" style="font-size:9px;color:var(--g30)">Personal Brand Brief</span></div>';
+  h += '<h2>Your Visible &amp; Trusted Brief</h2>';
+  h += '<div class="meta">'+esc(a.profile.field||"Personal brand")+' · '+(a.direction==="clients"?"Attract clients & business":"Build career reputation")+' · for podcast, PR &amp; content collaborators</div>';
+  // hero word
+  h += '<div class="hero"><span class="hl">The word you own</span><div class="word">'+esc(D.ownable_word||"—")+'</div>'+
+       '<div class="rat">'+esc(D.ownable_rationale||"")+'</div></div>';
+  // positioning + pull quote
+  h += '<div class="section"><span class="btag">Positioning</span><div class="pos">'+esc(D.positioning||"")+'</div>'+
+       (D.pull_quote?'<div class="pq">\u201C'+esc(D.pull_quote)+'\u201D</div>':'')+'</div>';
+  // audience
+  if(D.audience && typeof D.audience==="object"){
+    var rows=[["Primary audience",D.audience.line],["The moment",D.audience.moment],["What they feel",D.audience.feel],["What they want",D.audience.want],["Where they are",D.audience.where]];
+    var trs=rows.filter(function(r){return r[1];}).map(function(r){return '<tr><td class="k">'+r[0]+'</td><td class="v">'+esc(r[1])+'</td></tr>';}).join("");
+    h += '<div class="section"><span class="btag">Who you\u2019re speaking to</span><table class="t">'+trs+'</table></div>';
+  }
+  // pillars
+  if(D.message_pillars && D.message_pillars.length){
+    var pc = D.message_pillars.map(function(p,i){
+      var obj = typeof p==="object";
+      return '<div class="pcard"><span class="pn">'+("0"+(i+1)).slice(-2)+'</span>'+
+        '<div class="pnm">'+esc(obj?p.name:p)+'</div>'+
+        (obj&&p.covers?'<div class="pcv">'+esc(p.covers)+'</div>':'')+
+        (obj&&p.angle?'<div class="pag">'+esc(p.angle)+'</div>':'')+'</div>';
+    }).join("");
+    h += '<div class="section"><span class="btag">What you talk about — message pillars</span><div class="row3">'+pc+'</div></div>';
+  }
+  // voice
+  if(D.voice && typeof D.voice==="object"){
+    h += '<div class="section"><span class="btag">How you should sound</span>'+
+      '<p class="small" style="margin-bottom:12px">'+esc(D.voice.summary||"")+'</p><div class="row2">'+
+      '<div><span class="mlabel">Words &amp; moves that fit</span><ul class="ul">'+(D.voice.fit||[]).map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul></div>'+
+      '<div><span class="mlabel">What to avoid</span><ul class="ul">'+(D.voice.avoid||[]).map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul></div>'+
+      '</div></div>';
+  }
+  // bios
+  if(D.bios){
+    h += '<div class="section"><span class="btag">Boilerplate bios — ready to paste</span>'+
+      (D.bios.one_line?'<span class="mlabel">One line</span><p class="bio">'+esc(D.bios.one_line)+'</p>':'')+
+      (D.bios.short?'<span class="mlabel">Short (~50 words)</span><p class="bio">'+esc(D.bios.short)+'</p>':'')+
+      (D.bios.long?'<span class="mlabel">Long (~90 words)</span><p class="bio">'+esc(D.bios.long)+'</p>':'')+'</div>';
+  }
+  // talking
+  if(D.talking){
+    h += '<div class="section"><span class="btag">Talking points &amp; signature stories</span><div class="row2">'+
+      '<div><span class="mlabel">Topics you own</span><ul class="ul">'+(D.talking.own||[]).map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul></div>'+
+      '<div><span class="mlabel">Signature stories</span><ul class="ul">'+(D.talking.stories||[]).map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul></div></div>'+
+      ((D.talking.avoid&&D.talking.avoid.length)?'<span class="mlabel">Steer away from</span><ul class="ul">'+D.talking.avoid.map(function(x){return '<li>'+esc(x)+'</li>';}).join("")+'</ul>':'')+'</div>';
+  }
+  // sound bites
+  if(D.sound_bites && D.sound_bites.length){
+    h += '<div class="section"><span class="btag">Sound bites — quotable lines</span>'+
+      D.sound_bites.map(function(s){return '<div class="sb"><b>\u201C</b><span>'+esc(s)+'\u201D</span></div>';}).join("")+'</div>';
+  }
+  // angles
+  if(D.angles && D.angles.length){
+    var ar=D.angles.filter(function(g){return g&&g.format;}).map(function(g){return '<tr><td class="k">'+esc(g.format)+'</td><td class="v">'+esc(g.angle)+'</td></tr>';}).join("");
+    h += '<div class="section"><span class="btag">Ready-to-use angles</span><table class="t">'+ar+'</table></div>';
+  }
+  // first move / 90 day
+  h += '<div class="splitbox">'+
+    '<div class="a"><span class="l mono" style="color:var(--red)">Your first move this week</span><div style="font-size:13.5px;color:var(--g90);font-weight:600;line-height:1.5">'+esc(D.first_move||"")+'</div></div>'+
+    '<div class="b"><span class="l mono" style="color:var(--g50)">The 90-day rhythm</span><div style="font-size:13.5px;color:var(--g70);line-height:1.5">'+esc(D.ninety_day||"")+'</div></div>'+
+  '</div>';
+  h += '<div style="border-top:1px solid var(--g10);padding-top:14px;display:flex;justify-content:space-between"><span class="tiny">The Brand Company · Visible &amp; Trusted</span><span class="tiny">2025</span></div>';
+  h += '</div>'; // brief
+  h += '<div class="noprint" style="text-align:center;margin-top:22px"><span class="tiny">Refine any answer by clicking its step above, then re-distil.</span>'+
+       '<div style="margin-top:12px"><button class="btn ghost sm" data-distill="1">Re-distil &#8635;</button></div></div>';
+  return h;
+}
+
+/* ---- distillation ---- */
+function distillPayload(){
+  var a=S.a;
+  return "PROFILE\n"+ctx()+"\n\nBELIEF: "+a.d1.belief+"\nAUDIENCE PATTERN: "+a.d1.pattern+
+    "\nAUDIENCE DEEP DIVE: "+a.d2.deepdive+"\nPOSITIONING: "+(a.d3.final||a.d3.v3||a.d3.v2||a.d3.v1)+
+    "\nWORD TO OWN: "+a.own.word+" — because: "+a.own.why+"\nTHROUGH-LINE: "+a.d4.throughline+
+    "\nCORE BELIEFS: "+[a.d4.b1,a.d4.b2,a.d4.b3].filter(Boolean).join(" | ")+
+    "\nPLATFORM: "+a.d5.platform+" / RHYTHM: "+a.d5.rhythm+
+    "\nPOSTS: "+[a.d5.p1,a.d5.p2,a.d5.p3].filter(Boolean).join(" | ")+
+    "\nPROOF: "+(a.proof.credibility||"(none)")+"\nSTORIES: "+(a.proof.stories||"(none)")+
+    "\nTOPICS OWN: "+(a.proof.topics_own||"(none)")+"\nTOPICS AVOID: "+(a.proof.topics_avoid||"(none)");
+}
+var DCORE_SYS = "You are a senior strategist at The Brand Company distilling a Visible & Trusted engagement into the core of a personal-brand brief. Use the person's own answers. Concrete, specific, plain language, no nothing-words, no em dashes. Return ONLY JSON: {\"positioning\":\"\",\"ownable_word\":\"\",\"ownable_rationale\":\"\",\"pull_quote\":\"under 15 words\",\"audience\":{\"line\":\"\",\"moment\":\"\",\"feel\":\"\",\"want\":\"\",\"where\":\"\"},\"message_pillars\":[{\"name\":\"\",\"covers\":\"\",\"angle\":\"\"}],\"voice\":{\"summary\":\"\",\"fit\":[\"\",\"\",\"\"],\"avoid\":[\"\",\"\",\"\"]},\"first_move\":\"\",\"ninety_day\":\"\"}. Exactly 3 message_pillars.";
+var DBRIEF_SYS = "You are a senior strategist at The Brand Company writing the collaborator-facing parts of a personal-brand brief (for a podcast producer, PR firm, or ghostwriter). Use their answers, especially proof and stories. Specific, plain, no em dashes, no invented facts. Return ONLY JSON: {\"bios\":{\"one_line\":\"\",\"short\":\"~50 words\",\"long\":\"~90 words\"},\"talking\":{\"own\":[\"\",\"\",\"\"],\"stories\":[\"\",\"\"],\"avoid\":[\"\",\"\"]},\"sound_bites\":[\"\",\"\",\"\",\"\"],\"angles\":[{\"format\":\"Podcast episode\",\"angle\":\"\"},{\"format\":\"Guest pitch\",\"angle\":\"\"},{\"format\":\"Article / op-ed\",\"angle\":\"\"},{\"format\":\"LinkedIn post\",\"angle\":\"\"}]}";
+
+function runDistill(){
+  S.distilling = true; S.distillErr = null; S.distill = S.distill || null; render();
+  var payload = distillPayload();
+  callClaude(DCORE_SYS, payload).then(function(t){
+    var core = parseJSON(t);
+    S.distill = Object.assign({}, S.distill||{}, core);
+    render();
+    return callClaude(DBRIEF_SYS, payload);
+  }).then(function(t2){
+    var brief = parseJSON(t2);
+    S.distill = Object.assign({}, S.distill||{}, brief);
+    S.distilling = false; render();
+  }).catch(function(){
+    S.distill = localDistill(); S.distilling = false; render();
+  });
+}
+
+/* offline distillation: assemble a real brief from the user's own words */
+function localDistill(){
+  var a=S.a;
+  var beliefs=[a.d4.b1,a.d4.b2,a.d4.b3].filter(Boolean);
+  var posts=[a.d5.p1,a.d5.p2,a.d5.p3].filter(Boolean);
+  var stories=(a.proof.stories||"").split(/\n|\. (?=[A-Z])/).map(function(s){return s.trim().replace(/\.$/,"");}).filter(Boolean).slice(0,2);
+  var topicsOwn=(a.proof.topics_own||"").split(/[,;\n]/).map(function(s){return s.trim();}).filter(Boolean).slice(0,3);
+  var topicsAvoid=(a.proof.topics_avoid||"").split(/[,;\n]/).map(function(s){return s.trim();}).filter(Boolean).slice(0,2);
+  var field=a.profile.field||"this field";
+  var word=a.own.word||"—";
+  var firstBelief=beliefs[0]||a.d1.belief||"";
+  function firstSentence(t){ if(!t) return ""; var m=t.split(/(?<=[.!?])\s/)[0]; return m.length>90?m.slice(0,88)+"…":m; }
+  return {
+    _offline:true,
+    positioning: a.d3.final || a.d3.v3 || a.d3.v2 || a.d3.v1 || "",
+    ownable_word: word,
+    ownable_rationale: a.own.why || "",
+    pull_quote: firstSentence(firstBelief),
+    audience: { line:a.profile.audience||firstSentence(a.d2.deepdive), moment:"", feel:"", want:"", where:a.profile.where||"" },
+    message_pillars: (beliefs.length?beliefs:posts).slice(0,3).map(function(b,i){
+      return { name:("Theme "+(i+1)), covers:b, angle:(posts[i]||"") };
+    }),
+    voice: { summary:(a.d4.throughline||"Plain, direct, and specific. Sound like a real person who knows the work."),
+             fit:["Plain language in your audience's words","One specific example over ten claims","Say what you actually believe"],
+             avoid:["Nothing-words and hype","Jargon and CV-speak","Trying to speak to everyone at once"] },
+    bios: {
+      one_line: (a.profile.field? "A "+a.profile.field+" who "+(a.d4.throughline||"does the work that matters")+".":""),
+      short: [a.d4.throughline, a.proof.credibility].filter(Boolean).join(" "),
+      long: [a.d3.final, a.proof.credibility, firstBelief].filter(Boolean).join(" ")
+    },
+    talking: {
+      own: topicsOwn.length?topicsOwn:beliefs.slice(0,3),
+      stories: stories,
+      avoid: topicsAvoid
+    },
+    sound_bites: beliefs.concat(posts).filter(Boolean).slice(0,4),
+    angles: [
+      {format:"Podcast episode", angle:posts[0]||firstBelief},
+      {format:"Guest pitch", angle:a.proof.credibility||a.d3.final},
+      {format:"Article / op-ed", angle:posts[1]||beliefs[1]||""},
+      {format:"LinkedIn post", angle:posts[2]||a.d6.opening||""}
+    ].filter(function(x){return x.angle;}),
+    first_move: a.d6.opening ? ("Publish your first post: \u201C"+firstSentence(a.d6.opening)+"\u201D") : "Write and publish one post this week from your sharpest belief.",
+    ninety_day: (a.d5.platform? ("One post a week on "+a.d5.platform+", review what resonates at 90 days.") : "One post a week on one platform; review at 90 days.")
+  };
+}
+
+/* ---- extraction (paste-to-start, optional) ---- */
+var EXTRACT_SYS = "You are a brand strategist at The Brand Company reading text a professional pasted (a CV, bio, or about-page). Pull out only what is GENUINELY present and map it to a personal-brand workbook. Do NOT invent or flatter; if something isn't there, leave it empty. Return ONLY JSON: {\"summary\":\"one sentence on what this is\",\"fields\":{\"field\":{\"value\":\"\",\"conf\":\"stated|inferred|missing\"},\"goal\":{\"value\":\"\",\"conf\":\"\"},\"audience\":{\"value\":\"\",\"conf\":\"\"},\"belief\":{\"value\":\"\",\"conf\":\"\"},\"positioning\":{\"value\":\"\",\"conf\":\"\"},\"throughline\":{\"value\":\"\",\"conf\":\"\"}}}";
+var EXTRACT_MAP = [["field","Profession / field","profile.field"],["goal","Primary goal","profile.goal"],["audience","Audience","profile.audience"],["belief","A belief / point of view","d1.belief"],["positioning","Existing positioning","d3.v1"],["throughline","Through-line","d4.throughline"]];
+var lastExtract=null;
+function runExtract(){
+  var text=(document.getElementById("pasteDoc")||{}).value||"";
+  var note=document.getElementById("extractNote");
+  var resBox=document.getElementById("extractResult");
+  if(text.trim().length<20){ if(note) note.textContent="Paste a bit more text first (a few sentences)."; return; }
+  if(note) note.innerHTML='<span class="spin"></span> Reading…';
+  callClaude(EXTRACT_SYS, "Extract the workbook fields from this text.\n\nDOCUMENT TEXT\n\"\"\""+text.slice(0,12000)+"\"\"\"").then(function(t){
+    var r=parseJSON(t); lastExtract=r; renderExtract(r); if(note) note.textContent="Review-and-confirm — tick what's true";
+  }).catch(function(){
+    if(note) note.textContent="Live coach unavailable here — paste works inside Claude. You can fill the fields manually below.";
+  });
+}
+function renderExtract(r){
+  var box=document.getElementById("extractResult"); if(!box) return;
+  var rows=EXTRACT_MAP.map(function(m){
+    var f=(r.fields&&r.fields[m[0]])||{value:"",conf:"missing"};
+    var has=!!(f.value||"").trim();
+    var conf=f.conf==="stated"?"FROM DOC":f.conf==="inferred"?"INFERRED":"NOT FOUND";
+    return '<div class="pickrow"><input type="checkbox" data-ex="'+m[2]+'" '+(has?'checked':'disabled')+'>'+
+      '<div style="flex:1"><div style="display:flex;gap:8px;align-items:baseline"><span style="font-size:12px;font-weight:700;color:'+(has?'var(--black)':'var(--g30)')+'">'+m[1]+'</span>'+
+      '<span class="tiny" style="color:'+(f.conf==="stated"?"var(--black)":f.conf==="inferred"?"var(--g50)":"var(--g30)")+'">'+conf+'</span></div>'+
+      (has?'<div style="font-size:13px;color:var(--g70);line-height:1.45;margin-top:3px">'+esc(f.value)+'</div>':'')+'</div></div>';
+  }).join("");
+  box.innerHTML='<div style="margin-top:14px">'+(r.summary?'<div style="font-size:12.5px;color:var(--g70);font-style:italic;margin-bottom:8px">'+esc(r.summary)+'</div>':'')+
+    rows+'<div style="margin-top:14px"><button class="btn red sm" data-applyextract="1">Use the ticked items &rarr;</button></div></div>';
+}
+function applyExtract(){
+  if(!lastExtract) return;
+  document.querySelectorAll('[data-ex]').forEach(function(cb){
+    if(cb.checked){
+      var path=cb.getAttribute("data-ex"); var p=path.split(".");
+      var f=lastExtract.fields[EXTRACT_MAP.filter(function(m){return m[2]===path;})[0][0]];
+      if(f && f.value){ S.a[p[0]][p[1]]=f.value; }
+    }
+  });
+  render();
+}
+
+/* ---- challenge button handler ---- */
+function doChallenge(id){
+  var wrap=document.querySelector('[data-cid="'+id+'"]');
+  if(!wrap) return;
+  var bind=wrap.getAttribute("data-bind");
+  var sysKey=wrap.getAttribute("data-sys");
+  var exercise=wrap.getAttribute("data-exercise");
+  var p=bind.split("."); var answer=S.a[p[0]][p[1]]||"";
+  var critBox=document.getElementById("crit-"+id);
+  var btn=document.querySelector('[data-challenge="'+id+'"]');
+  if(!answer || answer.trim().length<3){ critBox.innerHTML='<div style="margin-top:8px" class="mono" style="font-size:10px;color:var(--red)">Write something first.</div>'; return; }
+  btn.innerHTML='<span class="spin" style="border-top-color:#fff"></span> Thinking…'; btn.disabled=true;
+  var system = sysKey==="own"?OWN_SYS:CHALLENGE_SYS;
+  var context = ctx();
+  if(id==="d3_final") context += " Belief: "+S.a.d1.belief+". Target person: "+S.a.d2.deepdive+".";
+  if(id==="own_word") context += " Belief: "+S.a.d1.belief+". Positioning: "+(S.a.d3.final||S.a.d3.v3)+".";
+  challenge(system, context, exercise, answer).then(function(r){
+    var st=S.status[id]||{attempts:0};
+    S.status[id]={verdict:r.verdict, attempts:(st.attempts||0)+1};
+    critBox.innerHTML=critCardHTML(r);
+    var pill=document.getElementById("pill-"+id);
+    if(pill) pill.innerHTML='<span class="mono" style="font-size:10px;color:'+verdictColor(r.verdict)+'">'+(r.verdict==="sharp"?"\u2713 Sharp":r.verdict==="close"?"~ Close":"\u2717 Vague")+'</span>';
+    btn.innerHTML='Challenge this &rarr;'; btn.disabled=false;
+    updateGate();
+  });
+}
+function critCardHTML(r){
+  var col=verdictColor(r.verdict);
+  var vl={sharp:"SHARP",close:"CLOSE — KEEP GOING",vague:"TOO VAGUE"}[r.verdict]||"";
+  var bg=r.verdict==="vague"?"var(--redbg)":"var(--g05)";
+  var qs=(r.questions||[]).map(function(q){return '<div class="q"><b>?</b><span>'+esc(q)+'</span></div>';}).join("");
+  var rw=r.rewrite_hint?'<div class="rw"><span class="mono" style="font-size:9px;color:var(--g50);display:block;margin-bottom:4px">A sharper direction</span><em>'+esc(r.rewrite_hint)+'</em></div>':'';
+  var off=r.offline?'<span class="mono" style="font-size:8px;color:var(--g30);float:right;letter-spacing:.1em">Local check</span>':'';
+  return '<div class="crit"><div class="bar" style="background:'+col+'"></div><div class="body" style="background:'+bg+'">'+
+    off+'<span class="vl" style="color:'+col+'">'+vl+'</span>'+
+    '<div class="hl">'+esc(r.headline)+'</div><div class="cr">'+esc(r.critique)+'</div>'+qs+rw+'</div></div>';
+}
+function updateGate(){
+  var id=GATED[S.step]; if(!id) return;
+  var btn=document.querySelector('[data-nav="next"]'); if(!btn) return;
+  var ok=canContinue(); btn.disabled=!ok;
+  var note=document.querySelector('.gatenote');
+  if(ok && note) note.remove();
+}
+
+/* ---- export / import ---- */
+function exportAnswers(){
+  var blob=new Blob([JSON.stringify({a:S.a,status:S.status,distill:S.distill},null,2)],{type:"application/json"});
+  var url=URL.createObjectURL(blob); var l=document.createElement("a");
+  l.href=url; l.download="visible-trusted-brief-data.json"; l.click(); URL.revokeObjectURL(url);
+}
+function importAnswers(file){
+  var r=new FileReader();
+  r.onload=function(){ try{ var d=JSON.parse(r.result); if(d.a)S.a=d.a; if(d.status)S.status=d.status; if(d.distill)S.distill=d.distill; go(1);}catch(e){} };
+  r.readAsText(file);
+}
+
+/* ---- event delegation ---- */
+document.getElementById("app").addEventListener("input", function(e){
+  var t=e.target;
+  if(t.dataset && t.dataset.bind){
+    var p=t.dataset.bind.split("."); S.a[p[0]][p[1]]=t.value;
+    if(t.dataset.flags){ var fl=document.getElementById("flags-"+t.dataset.bind.replace(".","-")); if(fl) fl.innerHTML=flagsHTML(t.value); }
+  }
+});
+document.getElementById("app").addEventListener("click", function(e){
+  var t=e.target.closest("[data-go],[data-nav],[data-pick],[data-challenge],[data-distill],[data-export],[data-print],[data-resume],[data-extract],[data-applyextract]");
+  if(!t) return;
+  if(t.dataset.go!=null) return go(parseInt(t.dataset.go,10));
+  if(t.dataset.nav==="next") return next();
+  if(t.dataset.nav==="back") return back();
+  if(t.dataset.pick!=null){ S.a.direction=t.dataset.pick; render(); var b=document.querySelector('[data-nav="next"]'); return; }
+  if(t.dataset.challenge!=null) return doChallenge(t.dataset.challenge);
+  if(t.dataset.distill!=null){ if(S.step!==11){ go(11);} runDistill(); return; }
+  if(t.dataset.export!=null) return exportAnswers();
+  if(t.dataset.print!=null) return window.print();
+  if(t.dataset.resume!=null){ var f=document.getElementById("resumeFile"); if(f) f.click(); return; }
+  if(t.dataset.extract!=null) return runExtract();
+  if(t.dataset.applyextract!=null) return applyExtract();
+});
+document.getElementById("app").addEventListener("change", function(e){
+  if(e.target.id==="resumeFile" && e.target.files && e.target.files[0]) importAnswers(e.target.files[0]);
+});
+
+/* ---- boot ---- */
+render();
+</script>
+</body>
+</html>
